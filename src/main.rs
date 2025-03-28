@@ -18,10 +18,8 @@ struct Opt {
         required = true
     )]
     tracks: Vec<String>,
-    #[structopt(short = "u", long = "username", help = "Your Spotify username")]
-    username: String,
-    #[structopt(short = "p", long = "password", help = "Your Spotify password")]
-    password: Option<String>,
+    #[structopt(short = "t", long = "token", help = "Spotify access token")]
+    token: Option<String>,
     #[structopt(
         short = "d",
         long = "destination",
@@ -36,7 +34,7 @@ struct Opt {
     )]
     compression: Option<u32>,
     #[structopt(
-        short = "t",
+        short = "p",
         long = "parallel",
         help = "Number of parallel downloads. Default is 5.",
         default_value = "5"
@@ -73,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
     configure_logger();
 
     let opt = Opt::from_args();
-    create_destination_if_required(opt.destination.clone())?;
+    create_destination_if_required(opt.destination.clone()).unwrap();
 
     if opt.tracks.is_empty() {
         eprintln!("No tracks provided");
@@ -84,9 +82,9 @@ async fn main() -> anyhow::Result<()> {
         eprintln!("Compression level is not supported yet. It will be ignored.");
     }
 
-    let session = create_session(opt.username, opt.password).await?;
+    let session = create_session(opt.token).await.unwrap();
 
-    let track = get_tracks(opt.tracks, &session).await?;
+    let track = get_tracks(opt.tracks, &session).await.unwrap();
 
     let downloader = Downloader::new(session);
     downloader

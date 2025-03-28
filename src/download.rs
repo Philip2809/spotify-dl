@@ -14,6 +14,7 @@ use librespot::playback::config::PlayerConfig;
 use librespot::playback::mixer::NoOpVolume;
 use librespot::playback::mixer::VolumeGetter;
 use librespot::playback::player::Player;
+use tracing::Metadata;
 
 use crate::channel_sink::ChannelSink;
 use crate::encoder::Format;
@@ -77,9 +78,12 @@ impl Downloader {
     #[tracing::instrument(name = "download_track", skip(self))]
     async fn download_track(&self, track: Track, options: &DownloadOptions) -> Result<()> {
         let metadata = track.metadata(&self.session).await?;
+        let info: librespot::metadata::Track = track.info(&self.session).await?;
         tracing::info!("Downloading track: {:?}", metadata);
 
-        let file_name = self.get_file_name(&metadata);
+        println!("Downloading track: {:?}", info);
+
+        let file_name = self.get_file_name(&info);
         let path = options
             .destination
             .join(file_name.clone())
@@ -92,7 +96,7 @@ impl Downloader {
 
         let file_size = sink.get_approximate_size();
 
-        let (mut player, _) = Player::new(
+        let player = Player::new(
             self.player_config.clone(),
             self.session.clone(),
             self.volume_getter(),
@@ -147,7 +151,7 @@ impl Downloader {
         Box::new(NoOpVolume)
     }
 
-    fn get_file_name(&self, metadata: &TrackMetadata) -> String {
+    fn get_file_name(&self, metadata: &librespot::metadata::Track) -> String {
         // If there is more than 3 artists, add the first 3 and add "and others" at the end
         if metadata.artists.len() > 3 {
             let artists_name = metadata
@@ -158,8 +162,8 @@ impl Downloader {
                 .collect::<Vec<String>>()
                 .join(", ");
             return self.clean_file_name(format!(
-                "{}, and others - {}",
-                artists_name, metadata.track_name
+                "{:0>4} - {}, and others - {}",
+                metadata.number, artists_name, metadata.name
             ));
         }
 
@@ -169,7 +173,7 @@ impl Downloader {
             .map(|artist| artist.name.clone())
             .collect::<Vec<String>>()
             .join(", ");
-        self.clean_file_name(format!("{} - {}", artists_name, metadata.track_name))
+        self.clean_file_name(format!("{:0>4} - {} - {}", metadata.number, artists_name, metadata.name))
     }
 
     fn clean_file_name(&self, file_name: String) -> String {
